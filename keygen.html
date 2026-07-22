@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>เครื่องมือเข้ารหัสกุญแจ Sync — WST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--p:#0a4f46;--p2:#0e8a74;--bg:#f2f6f5;--ink:#1b2b28;--muted:#586b65;--line:#dfe9e6;--red:#e02424;--green:#0e9f6e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans Thai',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;padding:20px 14px 60px}
+.wrap{max-width:640px;margin:0 auto}
+h1{font-size:20px;color:var(--p);margin-bottom:4px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6}
+.card{background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(10,60,50,.08),0 4px 14px rgba(10,60,50,.06);padding:18px;margin-bottom:14px}
+label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin:12px 0 4px}
+input,textarea{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px}
+input:focus,textarea:focus{outline:none;border-color:var(--p2)}
+textarea{font-family:ui-monospace,Consolas,monospace;font-size:12px;min-height:120px}
+button{font-family:inherit;cursor:pointer;border:none;border-radius:12px;padding:12px 20px;font-size:15px;font-weight:800}
+.btn-p{background:var(--p2);color:#fff;width:100%;margin-top:14px}
+.btn-s{background:#eceff3;color:var(--ink);width:auto;padding:8px 16px;font-size:13px;margin-top:8px}
+.note{background:#fffbeb;border:1px solid #fce96a;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.6;margin-bottom:14px}
+.note.danger{background:#fdf2f2;border-color:#f8b4b4}
+#msg{font-size:13.5px;font-weight:700;min-height:20px;margin-top:10px}
+#out{display:none}
+ol{padding-left:20px;font-size:13px;line-height:1.8;color:var(--muted)}
+code{background:#eef4f2;border-radius:5px;padding:1px 6px;font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔐 เครื่องมือเข้ารหัสกุญแจ Sync</h1>
+  <div class="sub">สำหรับเปลี่ยน token ที่ฝังในเว็บแอป (Audit CRM / Audit Tracker) — ทุกอย่างทำงาน<b>ในเครื่องนี้เท่านั้น</b> ไม่มีการส่ง token หรือ PIN ออกไปที่ไหนทั้งสิ้น (ปิดเน็ตแล้วใช้ก็ยังได้ ยกเว้นปุ่มทดสอบ token)</div>
+
+  <div class="note danger">🚫 <b>ห้ามส่ง token (github_pat_/ghp_) หรือ PIN ให้ใครทั้งนั้น</b> รวมถึงใน chat — สิ่งเดียวที่ส่งต่อได้คือ "ผลลัพธ์ที่เข้ารหัสแล้ว" จากกล่องล่างสุด</div>
+
+  <div class="card">
+    <div style="font-weight:800;color:var(--p);font-size:14px">ขั้นตอนสร้าง token แบบไม่หมดอายุ</div>
+    <ol style="margin-top:8px">
+      <li>เปิด <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" style="color:#1a56db;font-weight:700">github.com/settings/personal-access-tokens/new</a> (ล็อกอิน tpnaudit)</li>
+      <li>Token name: <code>audit-sync-forever</code> · Expiration: <b>No expiration</b> (ถ้าไม่มีตัวเลือกนี้ ให้ใช้ classic token ที่ github.com/settings/tokens/new เลือก No expiration + scope repo)</li>
+      <li>Repository access → Only select repositories → <b>wst-audit-data</b></li>
+      <li>Permissions → Contents → <b>Read and write</b></li>
+      <li>Generate แล้ว copy มาวางด้านล่าง</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <label>Token (github_pat_... หรือ ghp_...)</label>
+    <input id="tk" autocomplete="off" spellcheck="false" placeholder="github_pat_xxxx">
+    <button class="btn-s" onclick="testToken()">🧪 ทดสอบ token กับ repo ข้อมูล</button>
+    <label>PIN (ตัวเดียวกับที่ใช้เปิดแอป)</label>
+    <input id="pin" autocomplete="off" inputmode="numeric" placeholder="PIN">
+    <button class="btn-p" onclick="gen()">🔐 เข้ารหัส</button>
+    <div id="msg"></div>
+  </div>
+
+  <div class="card" id="out">
+    <div style="font-weight:800;color:var(--green);margin-bottom:6px">✅ ผลลัพธ์ (เข้ารหัสแล้ว — ก้อนนี้ส่งต่อได้ปลอดภัย)</div>
+    <div class="sub" style="margin-bottom:8px">ระบบทดสอบถอดรหัสกลับด้วย PIN เดิมแล้วตรงกัน — copy ทั้งกล่องไปส่งให้ผู้ดูแลอัพเดทไฟล์ sync-token.enc.js ได้เลย</div>
+    <textarea id="blob" readonly onclick="this.select()"></textarea>
+    <button class="btn-s" onclick="copyBlob()">📋 Copy</button>
+  </div>
+</div>
+
+<script>
+const u8b64=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s);};
+const b64u8=b=>{const s=atob(b);const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u;};
+async function key(pin,salt,iter){
+  const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:iter,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+function say(t,ok){const m=document.getElementById('msg');m.textContent=t;m.style.color=ok?'var(--green)':'var(--red)';}
+async function testToken(){
+  const tk=document.getElementById('tk').value.trim();
+  if(!tk){say('ใส่ token ก่อน');return;}
+  say('⏳ กำลังทดสอบ...',true);
+  try{
+    const r=await fetch('https://api.github.com/repos/tpnaudit/wst-audit-data',{headers:{Authorization:'Bearer '+tk,Accept:'application/vnd.github+json'}});
+    if(r.ok)say('✅ token ใช้ได้ — เข้าถึง repo ข้อมูลสำเร็จ',true);
+    else say('❌ token เข้า repo ไม่ได้ (HTTP '+r.status+') — เช็ค Repository access ว่าเลือก wst-audit-data และ Contents = Read and write');
+  }catch(e){say('❌ ทดสอบไม่สำเร็จ: '+e.message);}
+}
+async function gen(){
+  const tk=document.getElementById('tk').value.trim();
+  const pin=document.getElementById('pin').value.trim();
+  if(!tk||!pin){say('ใส่ token และ PIN ให้ครบ');return;}
+  if(!/^(github_pat_|ghp_)/.test(tk)){say('token ต้องขึ้นต้นด้วย github_pat_ หรือ ghp_');return;}
+  if(!(window.crypto&&crypto.subtle)){say('ต้องเปิดผ่าน https หรือเปิดไฟล์ผ่าน localhost');return;}
+  try{
+    say('⏳ กำลังเข้ารหัส...',true);
+    const iter=600000;
+    const salt=crypto.getRandomValues(new Uint8Array(16));
+    const iv=crypto.getRandomValues(new Uint8Array(12));
+    const k=await key(pin,salt,iter);
+    const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},k,new TextEncoder().encode(JSON.stringify(tk))));
+    const payload={v:1,iter,salt:u8b64(salt),iv:u8b64(iv),ct:u8b64(ct)};
+    /* ทดสอบถอดกลับเพื่อยืนยันว่า PIN ที่พิมพ์ใช้ถอดได้จริง */
+    const k2=await key(pin,b64u8(payload.salt),iter);
+    const back=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64u8(payload.iv)},k2,b64u8(payload.ct))));
+    if(back!==tk)throw new Error('ถอดรหัสกลับไม่ตรง');
+    document.getElementById('blob').value='window.SYNC_TOKEN_ENC = '+JSON.stringify(payload)+';';
+    document.getElementById('out').style.display='block';
+    say('✅ เข้ารหัสสำเร็จ (ตรวจถอดกลับแล้วตรงกัน)',true);
+  }catch(e){say('❌ '+e.message);}
+}
+function copyBlob(){
+  const t=document.getElementById('blob');t.select();
+  navigator.clipboard.writeText(t.value).then(()=>say('📋 copy แล้ว',true),()=>document.execCommand('copy'));
+}
+</script>
+</body>
+</html>
